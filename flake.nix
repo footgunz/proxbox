@@ -23,7 +23,7 @@
             inherit version;
             src = ./.;
 
-            vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+            vendorHash = "sha256-E0sUSuzsxRCmKydKvyfGq7719fSy7gxFbzxseXHRq+Y=";
 
             ldflags = [
               "-s"  # Strip symbol table
