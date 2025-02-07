@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binaries
+        run: |
+          # Linux AMD64
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X github.com/footgunz/proxbox/cmd.Version=${{ steps.get_version.outputs.VERSION }} -X github.com/footgunz/proxbox/cmd.CommitSHA=${GITHUB_SHA}" -o proxbox-linux-amd64
+          
+          # Linux ARM64
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X github.com/footgunz/proxbox/cmd.Version=${{ steps.get_version.outputs.VERSION }} -X github.com/footgunz/proxbox/cmd.CommitSHA=${GITHUB_SHA}" -o proxbox-linux-arm64
+          
+          # macOS AMD64
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X github.com/footgunz/proxbox/cmd.Version=${{ steps.get_version.outputs.VERSION }} -X github.com/footgunz/proxbox/cmd.CommitSHA=${GITHUB_SHA}" -o proxbox-darwin-amd64
+          
+          # macOS ARM64
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/footgunz/proxbox/cmd.Version=${{ steps.get_version.outputs.VERSION }} -X github.com/footgunz/proxbox/cmd.CommitSHA=${GITHUB_SHA}" -o proxbox-darwin-arm64
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Calculate SHA256 hashes
+        id: hashes
+        run: |
+          echo "LINUX_AMD64=$(nix hash file proxbox-linux-amd64)" >> $GITHUB_OUTPUT
+          echo "LINUX_ARM64=$(nix hash file proxbox-linux-arm64)" >> $GITHUB_OUTPUT
+          echo "DARWIN_AMD64=$(nix hash file proxbox-darwin-amd64)" >> $GITHUB_OUTPUT
+          echo "DARWIN_ARM64=$(nix hash file proxbox-darwin-arm64)" >> $GITHUB_OUTPUT
+
+      - name: Update flake.nix
+        run: |
+          cat > flake.nix << 'EOL'
+          {
+            description = "HTTP and SOCKS proxy server";
+
+            inputs = {
+              nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+            };
+
+            outputs = { self, nixpkgs }:
+              let
+                supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+                forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+                pkgsFor = system: nixpkgs.legacyPackages.${system};
+                version = builtins.readFile ./VERSION;
+
+                binaryUrls = {
+                  "x86_64-linux" = {
+                    url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-amd64";
+                    sha256 = "${{ steps.hashes.outputs.LINUX_AMD64 }}";
+                  };
+                  "aarch64-linux" = {
+                    url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-arm64";
+                    sha256 = "${{ steps.hashes.outputs.LINUX_ARM64 }}";
+                  };
+                  "x86_64-darwin" = {
+                    url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-amd64";
+                    sha256 = "${{ steps.hashes.outputs.DARWIN_AMD64 }}";
+                  };
+                  "aarch64-darwin" = {
+                    url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-arm64";
+                    sha256 = "${{ steps.hashes.outputs.DARWIN_ARM64 }}";
+                  };
+                };
+              in
+              {
+                packages = forAllSystems (system:
+                  let
+                    pkgs = pkgsFor system;
+                  in
+                  {
+                    default = pkgs.buildGoModule {
+                      pname = "proxbox";
+                      inherit version;
+                      src = ./.;
+
+                      vendorHash = "sha256-E0sUSuzsxRCmKydKvyfGq7719fSy7gxFbzxseXHRq+Y=";
+
+                      ldflags = [
+                        "-s"  # Strip symbol table
+                        "-w"  # Strip DWARF debugging info
+                        "-X github.com/footgunz/proxbox/cmd.Version=${version}"
+                        "-X github.com/footgunz/proxbox/cmd.CommitSHA=${self.rev or "dev"}"
+                      ];
+
+                      meta = with pkgs.lib; {
+                        description = "HTTP and SOCKS proxy server";
+                        homepage = "https://github.com/footgunz/proxbox";
+                        license = licenses.mit;
+                        maintainers = [ ];
+                      };
+                    };
+
+                    binary = pkgs.stdenv.mkDerivation {
+                      pname = "proxbox-bin";
+                      inherit version;
+
+                      src = pkgs.fetchurl (binaryUrls.${system});
+
+                      dontUnpack = true;
+
+                      installPhase = ''
+                        mkdir -p $out/bin
+                        cp $src $out/bin/proxbox
+                        chmod +x $out/bin/proxbox
+                      '';
+
+                      meta = with pkgs.lib; {
+                        description = "HTTP and SOCKS proxy server (pre-built binary)";
+                        homepage = "https://github.com/footgunz/proxbox";
+                        license = licenses.mit;
+                        maintainers = [ ];
+                        platforms = [ system ];
+                      };
+                    };
+                  });
+
+                devShells = forAllSystems (system:
+                  let
+                    pkgs = pkgsFor system;
+                  in
+                  {
+                    default = pkgs.mkShell {
+                      buildInputs = with pkgs; [
+                        go
+                        gopls
+                        go-tools
+                      ];
+                    };
+                  });
+              };
+          }
+          EOL
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            proxbox-linux-amd64
+            proxbox-linux-arm64
+            proxbox-darwin-amd64
+            proxbox-darwin-arm64
+          generate_release_notes: true
+
+      - name: Create PR with updated flake.nix
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: update binary hashes for ${{ steps.get_version.outputs.VERSION }}"
+          title: "Update binary hashes for ${{ steps.get_version.outputs.VERSION }}"
+          body: |
+            This PR updates the binary hashes in flake.nix for release ${{ steps.get_version.outputs.VERSION }}.
+            
+            Changes:
+            - Updated SHA256 hashes for all platform binaries
+          branch: update-binary-hashes-${{ steps.get_version.outputs.VERSION }}
+          delete-branch: true 
