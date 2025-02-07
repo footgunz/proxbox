@@ -10,7 +10,8 @@
       supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: nixpkgs.legacyPackages.${system};
-      version = builtins.readFile ./VERSION;
+      # Use git describe to get version, fallback to 0.0.0 for local builds
+      version = if (self ? rev) then builtins.substring 1 (builtins.stringLength self.rev) self.rev else "0.0.0";
 
       # Add this new attribute set for binary URLs and hashes
       binaryUrls = {
