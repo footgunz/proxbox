@@ -51,10 +51,22 @@ jobs:
           echo "DARWIN_AMD64=$(nix hash file proxbox-darwin-amd64)" >> $GITHUB_OUTPUT
           echo "DARWIN_ARM64=$(nix hash file proxbox-darwin-arm64)" >> $GITHUB_OUTPUT
 
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            proxbox-linux-amd64
+            proxbox-linux-arm64
+            proxbox-darwin-amd64
+            proxbox-darwin-arm64
+          generate_release_notes: true
+
       - name: Checkout main branch
         run: |
           git fetch origin main
           git checkout main
+          # Clean up any untracked files
+          git clean -fdx
 
       - name: Update flake.nix
         run: |
@@ -71,7 +83,8 @@ jobs:
                 supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
                 forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
                 pkgsFor = system: nixpkgs.legacyPackages.${system};
-                version = builtins.readFile ./VERSION;
+                # Use git describe to get version, fallback to 0.0.0 for local builds
+                version = if (self ? rev) then builtins.substring 1 (builtins.stringLength self.rev) self.rev else "0.0.0";
 
                 binaryUrls = {
                   "x86_64-linux" = {
@@ -161,16 +174,6 @@ jobs:
           }
           EOL
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            proxbox-linux-amd64
-            proxbox-linux-arm64
-            proxbox-darwin-amd64
-            proxbox-darwin-arm64
-          generate_release_notes: true
-
       - name: Create PR with updated flake.nix
         uses: peter-evans/create-pull-request@v6
         with:
@@ -181,6 +184,9 @@ jobs:
             
             Changes:
             - Updated SHA256 hashes for all platform binaries
+            - Switched to git-based versioning
           branch: update-binary-hashes-${{ steps.get_version.outputs.VERSION }}
           base: main
           delete-branch: true
+          add-paths: |
+            flake.nix
