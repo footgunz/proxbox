@@ -13,23 +13,22 @@
       # Use git describe to get version, fallback to 0.0.0 for local builds
       version = if (self ? rev) then builtins.substring 1 (builtins.stringLength self.rev) self.rev else "0.0.0";
 
-      # Add this new attribute set for binary URLs and hashes
       binaryUrls = {
         "x86_64-linux" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-amd64";
-          sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Placeholder, will be updated by GH Action
+          sha256 = "sha256-pMkBSMN3yjLHf+0qJocQXt3m2wXQd1LuSk7EMEF9zPc=";
         };
         "aarch64-linux" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-arm64";
-          sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          sha256 = "sha256-BTQ67zx2pLRyLxQ7LUYWJpFR/VWuaykQpKDM3gueGUE=";
         };
         "x86_64-darwin" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-amd64";
-          sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          sha256 = "sha256-AB9BpyMcWBnuAMigt20B5vFpechgSCOA7/yRyFMyQCk=";
         };
         "aarch64-darwin" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-arm64";
-          sha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          sha256 = "sha256-FAKNFhAqfOen926c7QonaSV26dZ7FJZ3nfd8O+VaUsk=";
         };
       };
     in
@@ -61,7 +60,6 @@
             };
           };
 
-          # Add the new binary package
           binary = pkgs.stdenv.mkDerivation {
             pname = "proxbox-bin";
             inherit version;
