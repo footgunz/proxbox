@@ -51,6 +51,11 @@ jobs:
           echo "DARWIN_AMD64=$(nix hash file proxbox-darwin-amd64)" >> $GITHUB_OUTPUT
           echo "DARWIN_ARM64=$(nix hash file proxbox-darwin-arm64)" >> $GITHUB_OUTPUT
 
+      - name: Checkout main branch
+        run: |
+          git fetch origin main
+          git checkout main
+
       - name: Update flake.nix
         run: |
           cat > flake.nix << 'EOL'
@@ -177,4 +182,5 @@ jobs:
             Changes:
             - Updated SHA256 hashes for all platform binaries
           branch: update-binary-hashes-${{ steps.get_version.outputs.VERSION }}
-          delete-branch: true 
+          base: main
+          delete-branch: true
