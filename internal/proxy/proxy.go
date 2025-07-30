@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/armon/go-socks5"
@@ -21,15 +22,111 @@ func init() {
 	zap.ReplaceGlobals(logger)
 }
 
+// Output modes
+const (
+	ModeDefault = iota // Cursor animation (default)
+	ModeVerbose        // Detailed logs
+	ModeQuiet          // No output to stdout
+)
+
 var (
 	logger      = zap.S().Named("proxy")
 	httpLogger  = zap.S().Named("http")
 	socksLogger = zap.S().Named("socks")
+	
+	// Animation state
+	animationMutex sync.Mutex
+	animationChars = []string{"|", "/", "-", "\\"}
+	animationIndex = 0
+	
+	// Output mode state
+	outputMode = ModeDefault
+	modeInitialized = false
+	httpPortDisplayed = false
+	socksPortDisplayed = false
+	portDisplayMutex sync.Mutex
 )
 
+// showActivity provides visual feedback based on the current output mode
+func showActivity() {
+	switch outputMode {
+	case ModeDefault:
+		// Show cursor animation
+		animationMutex.Lock()
+		defer animationMutex.Unlock()
+		fmt.Print("\b" + animationChars[animationIndex])
+		animationIndex = (animationIndex + 1) % len(animationChars)
+	case ModeVerbose:
+		// Logging is handled by zap
+	case ModeQuiet:
+		// No output
+	}
+}
+
+// initOutputMode configures logging and output based on flags
+func initOutputMode(quiet, verbose bool) {
+	if modeInitialized {
+		return
+	}
+	modeInitialized = true
+	
+	// Determine output mode
+	if quiet {
+		outputMode = ModeQuiet
+	} else if verbose {
+		outputMode = ModeVerbose
+	} else {
+		outputMode = ModeDefault
+	}
+	
+	switch outputMode {
+	case ModeDefault:
+		// Disable standard logging, enable cursor animation
+		nopLogger := zap.NewNop()
+		zap.ReplaceGlobals(nopLogger)
+		// No initial setup here - will be done after port info is displayed
+	case ModeVerbose:
+		// Keep existing logging configuration
+		fmt.Println("Starting proxbox in verbose mode...")
+	case ModeQuiet:
+		// Disable all logging output
+		nopLogger := zap.NewNop()
+		zap.ReplaceGlobals(nopLogger)
+		// No initial output
+	}
+}
+
+// showPortInfo displays port information for default mode
+func showPortInfo(proxyType string, port int) {
+	if outputMode != ModeDefault {
+		return
+	}
+	
+	portDisplayMutex.Lock()
+	defer portDisplayMutex.Unlock()
+	
+	if proxyType == "HTTP" && !httpPortDisplayed {
+		fmt.Printf("HTTP proxy listening on port %d\n", port)
+		httpPortDisplayed = true
+	} else if proxyType == "SOCKS" && !socksPortDisplayed {
+		fmt.Printf("SOCKS proxy listening on port %d\n", port)
+		socksPortDisplayed = true
+	}
+	
+	// If both ports are displayed, start the animation on a new line
+	if httpPortDisplayed && socksPortDisplayed {
+		fmt.Print(animationChars[0])
+	}
+}
+
 // StartHTTPProxy starts an HTTP proxy server on the specified port
-func StartHTTPProxy(port int) error {
+func StartHTTPProxy(port int, quiet, verbose bool) error {
+	initOutputMode(quiet, verbose)
+	showPortInfo("HTTP", port)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Show activity based on output mode
+		showActivity()
+		
 		zap.S().Named("http").Debugw("client connected",
 			"remote_addr", r.RemoteAddr,
 			"method", r.Method,
@@ -156,7 +253,9 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // StartSocksProxy starts a SOCKS5 proxy server on the specified port
-func StartSocksProxy(port int) error {
+func StartSocksProxy(port int, quiet, verbose bool) error {
+	initOutputMode(quiet, verbose)
+	showPortInfo("SOCKS", port)
 	// Create listener first to log connections
 	addr := fmt.Sprintf(":%d", port)
 	listener, err := net.Listen("tcp", addr)
@@ -191,6 +290,9 @@ type loggingListener struct {
 func (l *loggingListener) Accept() (net.Conn, error) {
 	conn, err := l.Listener.Accept()
 	if err == nil {
+		// Show activity for each SOCKS connection
+		showActivity()
+		
 		zap.S().Named("socks").Debugw("client connected",
 			"remote_addr", conn.RemoteAddr().String(),
 		)

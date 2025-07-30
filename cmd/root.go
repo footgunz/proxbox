@@ -11,8 +11,10 @@ import (
 )
 
 var rootCmdFlags struct {
-	httpPort  int
+	httpPort int
 	socksPort int
+	quiet    bool
+	verbose  bool
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -26,14 +28,14 @@ var rootCmd = &cobra.Command{
 
 		// Start HTTP proxy in a goroutine
 		go func() {
-			if err := proxy.StartHTTPProxy(rootCmdFlags.httpPort); err != nil {
+			if err := proxy.StartHTTPProxy(rootCmdFlags.httpPort, rootCmdFlags.quiet, rootCmdFlags.verbose); err != nil {
 				errChan <- fmt.Errorf("HTTP proxy error: %v", err)
 			}
 		}()
 
 		// Start SOCKS proxy in a goroutine
 		go func() {
-			if err := proxy.StartSocksProxy(rootCmdFlags.socksPort); err != nil {
+			if err := proxy.StartSocksProxy(rootCmdFlags.socksPort, rootCmdFlags.quiet, rootCmdFlags.verbose); err != nil {
 				errChan <- fmt.Errorf("SOCKS proxy error: %v", err)
 			}
 		}()
@@ -65,4 +67,6 @@ func init() {
 	// when this action is called directly.
 	rootCmd.PersistentFlags().IntVarP(&rootCmdFlags.httpPort, "http-port", "p", 8889, "Port to listen on")
 	rootCmd.PersistentFlags().IntVarP(&rootCmdFlags.socksPort, "socks-port", "s", 8890, "Port to listen on")
+	rootCmd.PersistentFlags().BoolVarP(&rootCmdFlags.quiet, "quiet", "q", false, "Quiet mode - suppress all normal output")
+	rootCmd.PersistentFlags().BoolVarP(&rootCmdFlags.verbose, "verbose", "v", false, "Verbose mode - show detailed logs")
 }
