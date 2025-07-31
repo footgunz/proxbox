@@ -16,19 +16,19 @@
       binaryUrls = {
         "x86_64-linux" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-amd64";
-          sha256 = "sha256-VEaMm/QzRdqv5CTdCCIh8hV93DGrg84Z6faSYUAG12o=";
+          sha256 = "sha256-Dn52VpIniJWvwj75XAD1xqj2i7Sppqxo9STgNtiOlY8=";
         };
         "aarch64-linux" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-linux-arm64";
-          sha256 = "sha256-COwgutDjapk7bAwMQvdr20wxWcCZRYaPLSNSDDj/Ayo=";
+          sha256 = "sha256-fYZXp+LFIqbfi1Zi+sVN3g5vfJRkZOAH+q87Eta1SV8=";
         };
         "x86_64-darwin" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-amd64";
-          sha256 = "sha256-gHJS6f7udWvqTIsPV4OhMuwG9Plbec9VSs9PhCWrS+A=";
+          sha256 = "sha256-unlIhZW4hkE7lJBIQbdl5dl6MVgMzS4arwIMmhch3T8=";
         };
         "aarch64-darwin" = {
           url = "https://github.com/footgunz/proxbox/releases/download/v${version}/proxbox-darwin-arm64";
-          sha256 = "sha256-klyFy7wshO5TpOir1mdPW9MIZyuVfYdsiBh5fdgApI8=";
+          sha256 = "sha256-SMlf8wt8cBISvfzK7fEdBwBmgo2o4mAndZWLeb+SJQg=";
         };
       };
     in
